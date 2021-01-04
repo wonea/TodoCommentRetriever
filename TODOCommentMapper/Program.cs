@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using CommandLine;
 using Microsoft.Build.Evaluation;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -10,9 +11,13 @@ namespace TODOCommentMapper
 {
 	public static class Program
 	{
-		public static void Main(string[] args)
+		public static void Main(string[] args) =>
+			Parser.Default.ParseArguments<Options>(args)
+				.WithParsed(Parse);
+
+		private static void Parse(Options options)
 		{
-			var solutionFilePath = @"..\..\..\TODOCommentMapper.sln";
+			var solutionFilePath = options.Path;
 
 			var todoCommentIdentifier = new ToDoCommentIdentifier();
 			foreach (var csharpCompileFile in GetProjectFilesForSolution(new FileInfo(solutionFilePath)).SelectMany(projectFile => GetCSharpCompileItemFilesForProject(projectFile)))
