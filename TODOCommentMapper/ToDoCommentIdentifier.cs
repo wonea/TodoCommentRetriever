@@ -107,13 +107,19 @@ namespace TODOCommentMapper
 					);
 					var containingTypeIfAny = TryToGetContainingNode<TypeDeclarationSyntax>(containingNode);
 					var containingNameSpaceIfAny = TryToGetContainingNode<NamespaceDeclarationSyntax>(containingNode);
-					_commentLocated(new Comment(
-						triviaContent,
-						trivia.SyntaxTree.GetLineSpan(trivia.Span).StartLinePosition.Line,
-						containingMethodOrPropertyIfAny,
-						containingTypeIfAny,
-						containingNameSpaceIfAny
-					));
+
+					if (!trivia.Token.LeadingTrivia.ToString().StartsWith("// ReSharper ")
+						&& !trivia.Token.LeadingTrivia.ToString().StartsWith("//------------------------------------------------------------------------------")
+						&& !trivia.Token.LeadingTrivia.ToString().StartsWith("/*"))
+					{
+						_commentLocated(new Comment(
+							triviaContent,
+							trivia.SyntaxTree.GetLineSpan(trivia.Span).StartLinePosition.Line,
+							containingMethodOrPropertyIfAny,
+							containingTypeIfAny,
+							containingNameSpaceIfAny
+						));
+					}
 				}
 				base.VisitTrivia(trivia);
 			}
