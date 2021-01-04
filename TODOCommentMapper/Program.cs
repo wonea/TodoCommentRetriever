@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using CommandLine;
+using CsvHelper;
 using Microsoft.Build.Evaluation;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -15,15 +18,19 @@ namespace TODOCommentMapper
 			Parser.Default.ParseArguments<Options>(args)
 				.WithParsed(Parse);
 
+		public static List<RecordItem> RecordItems = new List<RecordItem>();
+		
 		private static void Parse(Options options)
 		{
-			var solutionFilePath = options.Path;
+			var solutionFilePath = options.SolutionFilePath;
 
 			var todoCommentIdentifier = new ToDoCommentIdentifier();
 			foreach (var csharpCompileFile in GetProjectFilesForSolution(new FileInfo(solutionFilePath)).SelectMany(projectFile => GetCSharpCompileItemFilesForProject(projectFile)))
 			{
 				foreach (var todoComment in todoCommentIdentifier.GetToDoComments(csharpCompileFile.OpenText().ReadToEnd()))
 				{
+					string methodOrProperty = string.Empty;
+					
 					Console.WriteLine(todoComment.Content);
 					Console.WriteLine();
 					if (todoComment.NamespaceIfAny == null)
@@ -37,23 +44,35 @@ namespace TODOCommentMapper
 						{
 							Console.Write("Method/Property: ");
 							if (todoComment.MethodOrPropertyIfAny is ConstructorDeclarationSyntax)
-								Console.Write(".ctor");
+								methodOrProperty = ".ctor";
 							else if (todoComment.MethodOrPropertyIfAny is MethodDeclarationSyntax)
-								Console.Write(((MethodDeclarationSyntax)todoComment.MethodOrPropertyIfAny).Identifier);
+								methodOrProperty = ((MethodDeclarationSyntax) todoComment.MethodOrPropertyIfAny).Identifier.ToString();
 							else if (todoComment.MethodOrPropertyIfAny is IndexerDeclarationSyntax)
-								Console.Write("[Indexer]");
+								methodOrProperty = "[Indexer]";
 							else if (todoComment.MethodOrPropertyIfAny is PropertyDeclarationSyntax)
-								Console.Write(((PropertyDeclarationSyntax)todoComment.MethodOrPropertyIfAny).Identifier);
+								methodOrProperty = ((PropertyDeclarationSyntax) todoComment.MethodOrPropertyIfAny)
+									.Identifier.ToString();
 							else
-								Console.Write("?");
+								methodOrProperty = "?";
+
+							Console.Write(methodOrProperty);
 							Console.WriteLine();
 						}
 					}
 					Console.WriteLine(csharpCompileFile.FullName + ":" + todoComment.LineNumber);
 					Console.WriteLine();
+					
+					RecordItems.Add(
+						new RecordItem(comment: todoComment.Content,
+							ns: todoComment.NamespaceIfAny.Name.ToString(),
+							type: todoComment.TypeIfAny.Identifier.ToString(),
+							methodOrProperty: methodOrProperty,
+							path: csharpCompileFile.FullName + ":" + todoComment.LineNumber));
 				}
 			}
 
+			WriteCsv(options.ReportFilePath);
+			
 			Console.WriteLine("Success! Press [Enter] to continue..");
 			Console.ReadLine();
 		}
@@ -80,6 +99,17 @@ namespace TODOCommentMapper
 				.Select(item => item.EvaluatedInclude)
 				.Where(include => include.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
 				.Select(include => new FileInfo(Path.Combine(projectFile.Directory.FullName, include)));
+		}
+
+		private static void WriteCsv(string reportPath)
+		{
+			using (var writer = new StreamWriter(reportPath))
+			using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+			{
+				csv.WriteRecords(RecordItems);
+			}
+			
+			Console.WriteLine($"Written report to {reportPath}");
 		}
 	}
 }
