@@ -18,7 +18,7 @@ namespace TODOCommentMapper
 			Parser.Default.ParseArguments<Options>(args)
 				.WithParsed(Parse);
 
-		public static List<RecordItem> RecordItems = new List<RecordItem>();
+		private static readonly List<RecordItem> RecordItems = new List<RecordItem>();
 		
 		private static void Parse(Options options)
 		{
